@@ -1,0 +1,42 @@
+---
+# tasks file for linux_host
+
+- name: OS Configuration
+  block:
+
+    - name: Creating Users
+      loop: "{{ user_defs }}"
+      when:
+        - user_defs is defined
+        - user_defs | length > 0
+      ansible.builtin.include_tasks: "create-linux-user.yml"
+
+    - name: Installing packages
+      ansible.builtin.package:
+        name: '{{ pkgs }}'
+        state: present
+
+    - name: Mount disks
+      vars:
+        non_boot_disks: "{{ hostvars[inventory_hostname].diskn | default([]) | rejectattr('id', 'equalto', 1) | list }}"
+      when:
+        - non_boot_disks | length > 0
+        - false # Not ready yet
+      loop: "{{ non_boot_disks }}"
+      loop_control:
+        loop_var: item
+      ansible.builtin.include_tasks: "mount-disks.yml"
+
+    # TODO unmount old shares not present/disabled in new config
+    - name: Mount NFS shares
+      # vars:
+      #   nfs_mountpoints:
+      #     - 1:
+      #       nfs_dev: "nas.local:/mnt/pool/folder"
+      #       path: /path/to/folder
+      #       nfs_opts: "rw,sync,hard,noatime,rsize=8192,wsize=8192,tcp,timeo=14,nfsvers=4"
+      loop: "{{ nfs_mountpoints }}"
+      when:
+        - nfs_mountpoints is defined
+        - nfs_mountpoints | length > 0
+      ansible.builtin.include_tasks: "mount-nfs.yml"
